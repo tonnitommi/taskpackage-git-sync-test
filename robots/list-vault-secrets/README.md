@@ -58,3 +58,5 @@ For more information, do not forget to check out the following:
 ## Publishing to Sema4.ai v3
 
 Every push to `main` that changes this folder publishes a new version of the `relink-tests-dev` task package on US3 (Task Engine Demo workspace). A tag `list-vault-secrets/v<version>` releases it to `relink-tests`, after approval. See [`taskpackage-git-sync`](../../taskpackage-git-sync/README.md).
+
+Plan check test.
