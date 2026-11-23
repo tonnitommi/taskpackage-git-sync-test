@@ -1,0 +1,25 @@
+# Which robot folders publish to which v3 task packages, per environment.
+#
+# environments: one entry per environment the CI publishes to.
+#   workspace: the v3 workspace id (the "Account ID" in v3's "Publish with rcc" dialog).
+#   url:       optional; the v3 instance, when it differs from the V3_URL CI variable.
+#   DEV and PROD can share a workspace (package pairs) or use separate workspaces.
+#
+# packages: repo-relative robot folder (the one holding robot.yaml) and, per environment, its
+#   task package id. A folder without an id for an environment is not published there.
+#   release: optional tag prefix for PROD releases; defaults to the folder's last part.
+#            Tag "<release>/v1.2.0" releases this folder; a plain "v1.2.0" releases every folder.
+#
+# Format: nested "key: value" maps only (no lists, no flow style), indented with spaces.
+
+environments:
+  dev:
+    workspace: be07a361-14a2-4f62-b8bc-3d2920d7f888
+  prod:
+    workspace: be07a361-14a2-4f62-b8bc-3d2920d7f888
+
+packages:
+  robots/list-vault-secrets:
+    release: list-vault-secrets
+    dev: 5af11a9d-69ac-4a51-ba85-567d9ea761c8   # relink-tests-dev
+    prod: cab2565f-b716-4197-91cd-09ef329f1f3a  # relink-tests

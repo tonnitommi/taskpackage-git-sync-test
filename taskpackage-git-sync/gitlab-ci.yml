@@ -1,0 +1,49 @@
+# GitLab CI template: publish robot folders to Sema4.ai v3 task packages.
+#   Push to the default branch -> DEV packages, for each mapped folder that changed.
+#   Tag <release>/v1.2.0        -> PROD packages, after approval of the v3-prod environment.
+#
+# Copy these jobs into .gitlab-ci.yml with taskpackage_sync.py and v3-packages.yaml, and set
+# SYNC_DIR to where you put them.
+#
+# Settings > Repository > Protected tags: protect "*/v*" and "v*".
+# Settings > CI/CD > Variables, scoped per environment (v3-dev, v3-prod):
+#   V3_RCC_CREDENTIALS  rcc access credential (identifier:secret). Masked; Protected.
+#   V3_URL              e.g. https://us3.sema4.ai
+# Operate > Environments > Protected environments: protect v3-prod with required approvals.
+#
+# Untested template: the GitHub Actions version in koodivaja is the one exercised end to end.
+
+variables:
+  SYNC_DIR: taskpackage-git-sync
+
+.v3-publish:
+  image: python:3.12-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates git >/dev/null
+
+publish-dev:
+  extends: .v3-publish
+  stage: deploy
+  environment: v3-dev
+  resource_group: v3-dev            # one publish at a time
+  variables:
+    GIT_DEPTH: 0
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+      variables:
+        SYNC_ARGS: --base $CI_COMMIT_BEFORE_SHA
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "web"
+      variables:
+        SYNC_ARGS: --all
+  script:
+    - python3 "$SYNC_DIR/taskpackage_sync.py" --environment dev $SYNC_ARGS
+
+publish-prod:
+  extends: .v3-publish
+  stage: deploy
+  environment: v3-prod              # protected environment: waits for approval
+  resource_group: v3-prod
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^(.+\/)?v[0-9]/
+  script:
+    - python3 "$SYNC_DIR/taskpackage_sync.py" --environment prod --tag "$CI_COMMIT_TAG"
