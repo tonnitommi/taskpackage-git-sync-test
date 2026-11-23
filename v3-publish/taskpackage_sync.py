@@ -2,12 +2,12 @@
 """Publish robot folders to Sema4.ai v3 task packages with `rcc cloud push`.
 
 Reads v3-packages.yaml (environments, and per robot folder a package id per environment) and
-publishes to one environment:
+publishes to one environment. --environment may be left out when the file names only one.
 
-  DEV:  taskpackage_sync.py --environment dev --base <commit>
+  Push: taskpackage_sync.py [--environment dev] --base <commit>
         Publishes each mapped folder that changed between <commit> and HEAD. Publishes every
         mapped folder when <commit> is missing or unknown, or when the mapping file changed.
-  PROD: taskpackage_sync.py --environment prod --tag <tag>
+  Tag:  taskpackage_sync.py --environment prod --tag <tag>
         "<release>/v1.2.0" publishes the folder whose release name matches; "v1.2.0" publishes
         every folder that has a PROD package.
   Any:  --all publishes every folder mapped for the environment; --dry-run only prints.
@@ -111,7 +111,7 @@ def git(*args: str, cwd: Path) -> str:
 
 
 def commit_exists(sha: str, repo_root: Path) -> bool:
-    return subprocess.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], cwd=repo_root, capture_output=True).returncode == 0
+    return subprocess.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], cwd=repo_root, capture_output=True, check=False).returncode == 0
 
 
 def changed_since(base: str, path: str, repo_root: Path) -> bool:
@@ -167,7 +167,9 @@ def prepare_rcc(work_dir: Path, url: str, credentials: str) -> list[str]:
     subprocess.run([rcc, "configuration", "import", "-f", str(profile), "--switch"], check=True, capture_output=True)
 
     # rcc echoes the credential when adding it, so its output never reaches the log.
-    added = subprocess.run([rcc, "configuration", "credentials", credentials, "--account", "ci", "--default"], capture_output=True)
+    added = subprocess.run(
+        [rcc, "configuration", "credentials", credentials, "--account", "ci", "--default"], capture_output=True, check=False
+    )
     if added.returncode != 0:
         raise SyncError("rcc did not accept V3_RCC_CREDENTIALS (expected identifier:secret)")
     return [rcc]
@@ -178,7 +180,7 @@ def prepare_rcc(work_dir: Path, url: str, credentials: str) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--environment", "-e", required=True, help="environment in the mapping file, e.g. dev or prod")
+    parser.add_argument("--environment", "-e", help="environment in the mapping file, e.g. dev or prod; optional when there is only one")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--base", help="publish folders changed since this commit")
     selection.add_argument("--tag", help="publish the folders this release tag names")
@@ -190,6 +192,10 @@ def main(argv: list[str] | None = None) -> int:
     repo_root = Path(git("rev-parse", "--show-toplevel", cwd=SCRIPT_DIR))
     mapping_path = args.mapping.resolve()
     mapping = load_mapping(mapping_path)
+    if args.environment is None:
+        if len(mapping["environments"]) != 1:
+            raise SyncError(f"{mapping_path.name} names several environments; choose one with --environment")
+        args.environment = next(iter(mapping["environments"]))
     environment = mapping["environments"].get(args.environment)
     if not isinstance(environment, dict) or not environment.get("workspace"):
         raise SyncError(f"environment {args.environment!r} is not in {mapping_path.name}, or has no workspace")
@@ -222,7 +228,8 @@ def main(argv: list[str] | None = None) -> int:
         for target in targets:
             print(f"--- Publishing {target.folder} -> {args.environment} package {target.package_id}", flush=True)
             pushed = subprocess.run(
-                [*rcc, "cloud", "push", "--account", "ci", "-d", str(repo_root / target.folder), "-r", target.package_id, "-w", workspace]
+                [*rcc, "cloud", "push", "--account", "ci", "-d", str(repo_root / target.folder), "-r", target.package_id, "-w", workspace],
+                check=False,
             )
             if pushed.returncode == 0:
                 print(f"Published {target.folder} to {args.environment} package {target.package_id}.", flush=True)

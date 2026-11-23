@@ -1,0 +1,55 @@
+# Publishes robot folders to Sema4.ai v3 task packages:
+#   Push to main         -> DEV packages, for each mapped folder that changed.
+#   Tag <release>/v1.2.0 -> that robot's PROD package, after approval in the v3-prod environment.
+#   Tag v1.2.0           -> every robot's PROD package, after approval.
+# Copy to .github/workflows/ and see publish-from-git/README.md in
+# https://github.com/sema4ai-external/robocorp-to-v3.
+name: Publish to v3
+
+on:
+  push:
+    branches: [main]
+    tags: ["*/v*", "v*"]                # path filters don't apply to tags
+    paths:
+      - "robots/**"                     # your robot folders
+      - "v3-publish/v3-packages.yaml"
+  workflow_dispatch:                    # from main: every DEV folder; from a tag: that release to PROD
+
+concurrency:
+  group: publish-to-v3-${{ github.ref_type }}   # one publish per environment at a time
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  dev:
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    environment: v3-dev
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0                # the script compares with the previous push
+      - name: Publish to DEV
+        env:
+          V3_URL: ${{ vars.V3_URL }}
+          V3_RCC_CREDENTIALS: ${{ secrets.V3_RCC_CREDENTIALS }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            v3-publish/taskpackage_sync.py --environment dev --base "${{ github.event.before }}"
+          else
+            v3-publish/taskpackage_sync.py --environment dev --all
+          fi
+
+  prod:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    environment: v3-prod                # waits for a required reviewer before it starts
+    steps:
+      - uses: actions/checkout@v5
+      - name: Publish to PROD
+        env:
+          V3_URL: ${{ vars.V3_URL }}
+          V3_RCC_CREDENTIALS: ${{ secrets.V3_RCC_CREDENTIALS }}
+        run: v3-publish/taskpackage_sync.py --environment prod --tag "${{ github.ref_name }}"

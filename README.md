@@ -1,9 +1,9 @@
-# taskpackage-git-sync test
+# Publish to v3: test repository
 
-Tests publishing Robocorp robots to Sema4.ai v3 task packages from GitHub Actions: merges to `main` publish to DEV, release tags publish to PROD after approval. See [`taskpackage-git-sync/README.md`](taskpackage-git-sync/README.md).
+The DEV and PROD setup from [Publish robots from Git to v3](https://github.com/sema4ai-external/robocorp-to-v3/tree/main/publish-from-git), running for real. Merges to `main` publish to DEV, and release tags publish to PROD after approval.
 
 | Path | What |
 | --- | --- |
 | `robots/list-vault-secrets` | Demo robot (Vault, Asset Storage and run-context tests) |
-| `taskpackage-git-sync/` | Sync script, folder-to-package mapping, docs and CI templates |
-| `.github/workflows/taskpackage-git-sync.yml` | The workflow |
+| `v3-publish/` | The sync script and the folder-to-package mapping |
+| `.github/workflows/publish-to-v3.yml` | The workflow |
